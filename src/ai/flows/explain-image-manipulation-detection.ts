@@ -1,3 +1,4 @@
+
 // @ts-nocheck
 'use server';
 
@@ -28,7 +29,7 @@ const ExplainImageManipulationDetectionOutputSchema = z.object({
   heatMapDataUri: z
     .string()
     .describe(
-      'A data URI containing a heatmap highlighting manipulated regions, that must include a MIME type and use Base64 encoding. Expected format: \'data:<mimetype>;base64,<encoded_data>\'.' 
+      'A data URI containing a heatmap highlighting manipulated regions, that must include a MIME type and use Base64 encoding. Expected format: \'data:<mimetype>;base64,<encoded_data>\'.'
     )
     .optional(),
   sourceVerification: z
@@ -129,7 +130,7 @@ const explainImageManipulationDetectionFlow = ai.defineFlow(
     const {heatMapDataUri} = await imageManipulationHeatmapGenerator(input);
 
     return {
-      explanation: output?.explanation || "Analysis could not be completed.",
+      explanation: output?.explanation || 'Analysis could not be completed.',
       heatMapDataUri: heatMapDataUri,
       sourceVerification: output?.sourceVerification,
     };
