@@ -106,17 +106,22 @@ const imageManipulationHeatmapGenerator = ai.defineFlow({
 },
 async (input) => {
   //In a real implementation, this should generate a heat map
-  const { media } = await ai.generate({
-    model: 'googleai/gemini-2.5-flash-image-preview',
-    prompt: [
-      {media: {url: input.photoDataUri}},
-      {text: 'generate a heatmap of the manipulated regions of this image'},
-    ],
-    config: {
-      responseModalities: ['TEXT', 'IMAGE'], // MUST provide both TEXT and IMAGE, IMAGE only won't work
-    },
-  });
-  return {heatMapDataUri: media?.url};
+  try {
+    const { media } = await ai.generate({
+      model: 'googleai/gemini-2.5-flash-image-preview',
+      prompt: [
+        {media: {url: input.photoDataUri}},
+        {text: 'generate a heatmap of the manipulated regions of this image'},
+      ],
+      config: {
+        responseModalities: ['TEXT', 'IMAGE'], // MUST provide both TEXT and IMAGE, IMAGE only won't work
+      },
+    });
+    return {heatMapDataUri: media?.url};
+  } catch (error) {
+    console.error('Error generating heatmap:', error);
+    return { heatMapDataUri: undefined };
+  }
 });
 
 const explainImageManipulationDetectionFlow = ai.defineFlow(
@@ -126,13 +131,25 @@ const explainImageManipulationDetectionFlow = ai.defineFlow(
     outputSchema: ExplainImageManipulationDetectionOutputSchema,
   },
   async input => {
-    const {output} = await explainImageManipulationDetectionPrompt(input);
-    const {heatMapDataUri} = await imageManipulationHeatmapGenerator(input);
+    try {
+      const [{ output }, { heatMapDataUri }] = await Promise.all([
+        explainImageManipulationDetectionPrompt(input),
+        imageManipulationHeatmapGenerator(input)
+      ]);
 
-    return {
-      explanation: output?.explanation || 'Analysis could not be completed.',
-      heatMapDataUri: heatMapDataUri,
-      sourceVerification: output?.sourceVerification,
-    };
+      return {
+        explanation: output?.explanation || 'Analysis could not be completed at this time.',
+        heatMapDataUri: heatMapDataUri,
+        sourceVerification: output?.sourceVerification,
+      };
+    } catch (error) {
+      console.error('Error in explainImageManipulationDetectionFlow:', error);
+      // Return a default valid object in case of any error.
+      return {
+        explanation: 'An error occurred during the analysis. Please try again.',
+        heatMapDataUri: undefined,
+        sourceVerification: undefined,
+      };
+    }
   }
 );
