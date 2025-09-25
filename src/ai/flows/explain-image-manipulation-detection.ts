@@ -127,6 +127,11 @@ const explainImageManipulationDetectionFlow = ai.defineFlow(
   async input => {
     const {output} = await explainImageManipulationDetectionPrompt(input);
     const {heatMapDataUri} = await imageManipulationHeatmapGenerator(input);
-    return {...output, heatMapDataUri};
+
+    return {
+      explanation: output?.explanation || "Analysis could not be completed.",
+      heatMapDataUri: heatMapDataUri,
+      sourceVerification: output?.sourceVerification,
+    };
   }
 );
