@@ -137,10 +137,14 @@ const explainImageManipulationDetectionFlow = ai.defineFlow(
         imageManipulationHeatmapGenerator(input)
       ]);
 
+      if (!output) {
+        throw new Error('Analysis prompt returned null output');
+      }
+
       return {
-        explanation: output?.explanation || 'Analysis could not be completed at this time.',
+        explanation: output.explanation,
         heatMapDataUri: heatMapDataUri,
-        sourceVerification: output?.sourceVerification,
+        sourceVerification: output.sourceVerification,
       };
     } catch (error) {
       console.error('Error in explainImageManipulationDetectionFlow:', error);
