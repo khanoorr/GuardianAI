@@ -57,13 +57,19 @@ const analyzeVideoFlow = ai.defineFlow(
     outputSchema: AnalyzeVideoOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    if (!output) {
+    try {
+      const {output} = await prompt(input);
+      if (!output) {
+        throw new Error('The AI model did not return a valid analysis. This might be due to a timeout or an internal error.');
+      }
+      return output;
+    } catch (error: any) {
+      console.error('Error in analyzeVideoFlow:', error);
+      // Return a structured error response that matches the output schema.
       return {
         deepfakeDetected: false,
-        analysisDetails: 'Could not analyze video at this time.'
-      }
+        analysisDetails: `An error occurred during video analysis: ${error.message || 'Please try again.'}`,
+      };
     }
-    return output;
   }
 );
