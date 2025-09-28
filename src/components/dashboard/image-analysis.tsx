@@ -53,6 +53,9 @@ export default function ImageAnalysis() {
     try {
       const photoDataUri = await fileToDataUri(file);
       const analysisResult = await explainImageManipulationDetection({ photoDataUri });
+      if (analysisResult.explanation.startsWith('An error occurred')) {
+        throw new Error(analysisResult.explanation);
+      }
       setResult(analysisResult);
     } catch (e: any) {
       const errorMessage = e.message || "An unknown error occurred.";
@@ -62,18 +65,12 @@ export default function ImageAnalysis() {
         title: "Analysis Failed",
         description: errorMessage,
       });
-      // Ensure result is set to a valid default state on error to avoid render issues
-      setResult({
-        explanation: 'An error occurred during analysis. Please try again.',
-        heatMapDataUri: undefined,
-        sourceVerification: undefined,
-      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const isManipulated = result && (result.heatMapDataUri || result.explanation.toLowerCase().includes('manipulat'));
+  const isManipulated = result && (result.heatMapDataUri || (result.explanation && result.explanation.toLowerCase().includes('manipulat')));
 
   return (
     <Card className="shadow-lg border-2">
@@ -120,14 +117,14 @@ export default function ImageAnalysis() {
                 <p>Analyzing... please wait.</p>
               </div>
             )}
-            {error && (
+            {error && !isLoading && (
               <Alert variant="destructive" className="max-w-md">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Error</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            {result && (
+            {result && !error && !isLoading && (
               <div className="p-4 w-full grid gap-4">
                 <h3 className="font-headline text-xl font-semibold text-center mb-2">Analysis Results</h3>
                 <Card className={isManipulated ? "border-destructive bg-destructive/10" : "border-primary bg-primary/10"}>
@@ -136,11 +133,11 @@ export default function ImageAnalysis() {
                     </CardHeader>
                 </Card>
                 
-                {result.heatMapDataUri && (
+                {result.heatMapDataUri && imagePreview && (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex flex-col gap-2">
                         <h4 className="text-sm font-semibold text-center">Original</h4>
-                        <Image src={imagePreview!} alt="Original" width={300} height={300} className="rounded-md object-contain aspect-square mx-auto" />
+                        <Image src={imagePreview} alt="Original" width={300} height={300} className="rounded-md object-contain aspect-square mx-auto" />
                     </div>
                     <div className="flex flex-col gap-2">
                         <h4 className="text-sm font-semibold text-center">Manipulation Heatmap</h4>

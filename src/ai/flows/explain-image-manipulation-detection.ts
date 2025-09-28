@@ -105,7 +105,6 @@ const imageManipulationHeatmapGenerator = ai.defineFlow({
   }),
 },
 async (input) => {
-  //In a real implementation, this should generate a heat map
   try {
     const { media } = await ai.generate({
       model: 'googleai/gemini-2.5-flash-image-preview',
@@ -132,25 +131,39 @@ const explainImageManipulationDetectionFlow = ai.defineFlow(
   },
   async input => {
     try {
-      const [{ output }, { heatMapDataUri }] = await Promise.all([
+      const [promptResult, heatmapResult] = await Promise.allSettled([
         explainImageManipulationDetectionPrompt(input),
         imageManipulationHeatmapGenerator(input)
       ]);
 
-      if (!output) {
-        throw new Error('Analysis prompt returned null output');
+      let explanation, sourceVerification, heatMapDataUri;
+
+      if (promptResult.status === 'fulfilled' && promptResult.value.output) {
+        explanation = promptResult.value.output.explanation;
+        sourceVerification = promptResult.value.output.sourceVerification;
+      } else {
+        const errorDetails = promptResult.status === 'rejected' ? promptResult.reason : 'Prompt returned null output';
+        console.error('Error from analysis prompt:', errorDetails);
+        explanation = 'An error occurred during image analysis. The model may be unavailable or the request timed out.';
+      }
+
+      if (heatmapResult.status === 'fulfilled') {
+        heatMapDataUri = heatmapResult.value.heatMapDataUri;
+      } else {
+        console.error('Error from heatmap generator:', heatmapResult.reason);
+        // We can still proceed without a heatmap
+        heatMapDataUri = undefined;
       }
 
       return {
-        explanation: output.explanation,
-        heatMapDataUri: heatMapDataUri,
-        sourceVerification: output.sourceVerification,
+        explanation,
+        heatMapDataUri,
+        sourceVerification,
       };
     } catch (error) {
       console.error('Error in explainImageManipulationDetectionFlow:', error);
-      // Return a default valid object in case of any error.
       return {
-        explanation: 'An error occurred during the analysis. Please try again.',
+        explanation: 'An unexpected error occurred during the analysis. Please try again.',
         heatMapDataUri: undefined,
         sourceVerification: undefined,
       };
