@@ -48,36 +48,43 @@ async function toBase64(url: string): Promise<string> {
 export async function createDemoVideo(
   input: CreateDemoVideoInput
 ): Promise<CreateDemoVideoOutput> {
-  let {operation} = await ai.generate({
-    model: googleAI.model('veo-2.0-generate-001'),
-    prompt: input.script,
-    config: {
-      durationSeconds: 8,
-      aspectRatio: '16:9',
-    },
-  });
+  try {
+    let {operation} = await ai.generate({
+      model: googleAI.model('veo-2.0-generate-001'),
+      prompt: input.script,
+      config: {
+        durationSeconds: 8,
+        aspectRatio: '16:9',
+      },
+    });
 
-  if (!operation) {
-    throw new Error('Expected the model to return an operation');
+    if (!operation) {
+      throw new Error('Expected the model to return an operation');
+    }
+
+    // Wait until the operation completes.
+    while (!operation.done) {
+      operation = await ai.checkOperation(operation);
+      // Sleep for 5 seconds before checking again.
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+
+    if (operation.error) {
+      throw new Error('failed to generate video: ' + operation.error.message);
+    }
+
+    const video = operation.output?.message?.content.find(p => !!p.media);
+    if (!video || !video.media?.url) {
+      throw new Error('Failed to find the generated video');
+    }
+    
+    const videoDataUri = await toBase64(video.media.url);
+
+    return { videoUrl: videoDataUri };
+  } catch (e: any) {
+    if (e.message && e.message.includes('503')) {
+      throw new Error('The video generation service is temporarily unavailable. Please try again in a few moments.');
+    }
+    throw e;
   }
-
-  // Wait until the operation completes.
-  while (!operation.done) {
-    operation = await ai.checkOperation(operation);
-    // Sleep for 5 seconds before checking again.
-    await new Promise(resolve => setTimeout(resolve, 5000));
-  }
-
-  if (operation.error) {
-    throw new Error('failed to generate video: ' + operation.error.message);
-  }
-
-  const video = operation.output?.message?.content.find(p => !!p.media);
-  if (!video || !video.media?.url) {
-    throw new Error('Failed to find the generated video');
-  }
-  
-  const videoDataUri = await toBase64(video.media.url);
-
-  return { videoUrl: videoDataUri };
 }
