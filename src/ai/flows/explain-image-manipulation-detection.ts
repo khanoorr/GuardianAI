@@ -24,18 +24,19 @@ export type ExplainImageManipulationDetectionInput = z.infer<
 >;
 
 const ExplainImageManipulationDetectionOutputSchema = z.object({
+  isManipulated: z
+    .boolean()
+    .describe(
+      'A boolean flag that is true if manipulation is detected, and false otherwise.'
+    ),
   explanation: z
     .string()
     .describe('Explanation of the detected image manipulations.'),
   heatMapDataUri: z
     .string()
     .describe(
-      "A data URI containing a heatmap highlighting manipulated regions, that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+      "A data URI containing a heatmap highlighting manipulated regions, that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
     )
-    .optional(),
-  sourceVerification: z
-    .string()
-    .describe('Source verification information, if available.')
     .optional(),
 });
 export type ExplainImageManipulationDetectionOutput = z.infer<
@@ -53,13 +54,14 @@ const explainImageManipulationDetectionPrompt = ai.definePrompt({
   input: {schema: ExplainImageManipulationDetectionInputSchema},
   output: {
     schema: z.object({
+      isManipulated: z
+        .boolean()
+        .describe(
+          'A boolean flag that is true if manipulation is detected, and false otherwise.'
+        ),
       explanation: z
         .string()
         .describe('Explanation of the detected image manipulations.'),
-      sourceVerification: z
-        .string()
-        .describe('Source verification information, if available.')
-        .optional(),
     }),
   },
   prompt: `You are an AI expert in image forensics. Analyze the provided image for signs of manipulation and generate an explanation.
@@ -72,9 +74,9 @@ Consider common manipulation techniques such as:
 - Retouching: Altering the appearance of objects or people in the image.
 - GAN artifacts: Signs of AI-generated content
 
-Provide a detailed explanation of any detected manipulations, including the techniques used and the regions affected. If no manipulation is detected, state that the image appears to be authentic.
+Based on your analysis, set the 'isManipulated' flag to true if you detect any signs of manipulation, and false otherwise.
 
-Also, please include source verification information to help determine the origin and authenticity of the image.
+Provide a detailed explanation for your conclusion in the 'explanation' field. If no manipulation is detected, state that the image appears to be authentic.
 
 Image: {{media url=photoDataUri}}`,
 });
@@ -87,7 +89,7 @@ const imageManipulationHeatmapGenerator = ai.defineFlow(
       heatMapDataUri: z
         .string()
         .describe(
-          "A data URI containing a heatmap highlighting manipulated regions, that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+          "A data URI containing a heatmap highlighting manipulated regions, that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
         )
         .optional(),
     }),
@@ -140,10 +142,10 @@ const explainImageManipulationDetectionFlow = ai.defineFlow(
         );
       }
 
-      const {explanation, sourceVerification} = analysisResult.value.output;
+      const {isManipulated, explanation} = analysisResult.value.output;
 
       const heatMapDataUri =
-        heatmapResult.status === 'fulfilled'
+        heatmapResult.status === 'fulfilled' && isManipulated
           ? heatmapResult.value.heatMapDataUri
           : undefined;
       
@@ -152,17 +154,15 @@ const explainImageManipulationDetectionFlow = ai.defineFlow(
       }
 
       return {
+        isManipulated,
         explanation,
         heatMapDataUri,
-        sourceVerification,
       };
     } catch (error: any) {
       console.error('Error in explainImageManipulationDetectionFlow:', error);
-      return {
-        explanation: error.message || 'An unexpected error occurred during the analysis. Please try again.',
-        heatMapDataUri: undefined,
-        sourceVerification: undefined,
-      };
+      throw new Error(
+        error.message || 'An unexpected error occurred during the analysis. Please try again.'
+      );
     }
   }
 );
