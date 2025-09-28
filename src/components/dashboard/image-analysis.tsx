@@ -70,7 +70,7 @@ export default function ImageAnalysis() {
     }
   };
 
-  const isManipulated = result && (result.heatMapDataUri || (result.explanation && result.explanation.toLowerCase().includes('manipulat')));
+  const isManipulated = result && (result.heatMapDataUri || (result.explanation && !result.explanation.toLowerCase().includes('authentic')));
 
   return (
     <Card className="shadow-lg border-2">
