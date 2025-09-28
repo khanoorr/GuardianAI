@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 'use server';
 
 /**
@@ -25,11 +24,13 @@ export type ExplainImageManipulationDetectionInput = z.infer<
 >;
 
 const ExplainImageManipulationDetectionOutputSchema = z.object({
-  explanation: z.string().describe('Explanation of the detected image manipulations.'),
+  explanation: z
+    .string()
+    .describe('Explanation of the detected image manipulations.'),
   heatMapDataUri: z
     .string()
     .describe(
-      'A data URI containing a heatmap highlighting manipulated regions, that must include a MIME type and use Base64 encoding. Expected format: \'data:<mimetype>;base64,<encoded_data>\'.'
+      "A data URI containing a heatmap highlighting manipulated regions, that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     )
     .optional(),
   sourceVerification: z
@@ -47,28 +48,20 @@ export async function explainImageManipulationDetection(
   return explainImageManipulationDetectionFlow(input);
 }
 
-const shouldIncludeSourceVerificationTool = ai.defineTool({
-  name: 'shouldIncludeSourceVerification',
-  description: 'Determines if source verification should be included in the response.',
-  inputSchema: z.object({
-    photoDataUri: z
-      .string()
-      .describe(
-        "A photo to be analyzed for manipulations, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-      ),
-  }),
-  outputSchema: z.boolean(),
-},
-async (input) => {
-  // Basic logic to decide whether to include source verification.
-  // More sophisticated logic can be added here based on the image.
-  return true; 
-});
-
 const explainImageManipulationDetectionPrompt = ai.definePrompt({
   name: 'explainImageManipulationDetectionPrompt',
   input: {schema: ExplainImageManipulationDetectionInputSchema},
-  output: {schema: ExplainImageManipulationDetectionOutputSchema},
+  output: {
+    schema: z.object({
+      explanation: z
+        .string()
+        .describe('Explanation of the detected image manipulations.'),
+      sourceVerification: z
+        .string()
+        .describe('Source verification information, if available.')
+        .optional(),
+    }),
+  },
   prompt: `You are an AI expert in image forensics. Analyze the provided image for signs of manipulation and generate an explanation.
 
 Consider common manipulation techniques such as:
@@ -81,47 +74,43 @@ Consider common manipulation techniques such as:
 
 Provide a detailed explanation of any detected manipulations, including the techniques used and the regions affected. If no manipulation is detected, state that the image appears to be authentic.
 
-{{#if shouldIncludeSourceVerification}}
 Also, please include source verification information to help determine the origin and authenticity of the image.
-{{/if}}
 
-Output the explanation, and heatmap data URI.
-
-Image: {{media url=photoDataUri}}
-`,
-  tools: [shouldIncludeSourceVerificationTool],
+Image: {{media url=photoDataUri}}`,
 });
 
-const imageManipulationHeatmapGenerator = ai.defineFlow({
-  name: 'imageManipulationHeatmapGeneratorFlow',
-  inputSchema: ExplainImageManipulationDetectionInputSchema,
-  outputSchema: z.object({
-    heatMapDataUri: z
-      .string()
-      .describe(
-        'A data URI containing a heatmap highlighting manipulated regions, that must include a MIME type and use Base64 encoding. Expected format: \'data:<mimetype>;base64,<encoded_data>\'.'
-      )
-      .optional(),
-  }),
-},
-async (input) => {
-  try {
-    const { media } = await ai.generate({
-      model: 'googleai/gemini-2.5-flash-image-preview',
-      prompt: [
-        {media: {url: input.photoDataUri}},
-        {text: 'generate a heatmap of the manipulated regions of this image'},
-      ],
-      config: {
-        responseModalities: ['TEXT', 'IMAGE'], // MUST provide both TEXT and IMAGE, IMAGE only won't work
-      },
-    });
-    return {heatMapDataUri: media?.url};
-  } catch (error) {
-    console.error('Error generating heatmap:', error);
-    return { heatMapDataUri: undefined };
+const imageManipulationHeatmapGenerator = ai.defineFlow(
+  {
+    name: 'imageManipulationHeatmapGeneratorFlow',
+    inputSchema: ExplainImageManipulationDetectionInputSchema,
+    outputSchema: z.object({
+      heatMapDataUri: z
+        .string()
+        .describe(
+          "A data URI containing a heatmap highlighting manipulated regions, that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+        )
+        .optional(),
+    }),
+  },
+  async input => {
+    try {
+      const {media} = await ai.generate({
+        model: 'googleai/gemini-2.5-flash-image-preview',
+        prompt: [
+          {media: {url: input.photoDataUri}},
+          {text: 'generate a heatmap of the manipulated regions of this image'},
+        ],
+        config: {
+          responseModalities: ['TEXT', 'IMAGE'],
+        },
+      });
+      return {heatMapDataUri: media?.url};
+    } catch (error) {
+      console.error('Error generating heatmap:', error);
+      return {heatMapDataUri: undefined};
+    }
   }
-});
+);
 
 const explainImageManipulationDetectionFlow = ai.defineFlow(
   {
@@ -131,28 +120,35 @@ const explainImageManipulationDetectionFlow = ai.defineFlow(
   },
   async input => {
     try {
-      const [promptResult, heatmapResult] = await Promise.allSettled([
+      const [analysisResult, heatmapResult] = await Promise.allSettled([
         explainImageManipulationDetectionPrompt(input),
-        imageManipulationHeatmapGenerator(input)
+        imageManipulationHeatmapGenerator(input),
       ]);
 
-      let explanation, sourceVerification, heatMapDataUri;
-
-      if (promptResult.status === 'fulfilled' && promptResult.value.output) {
-        explanation = promptResult.value.output.explanation;
-        sourceVerification = promptResult.value.output.sourceVerification;
-      } else {
-        const errorDetails = promptResult.status === 'rejected' ? promptResult.reason : 'Prompt returned null output';
-        console.error('Error from analysis prompt:', errorDetails);
-        explanation = 'An error occurred during image analysis. The model may be unavailable or the request timed out.';
+      if (
+        analysisResult.status === 'rejected' ||
+        !analysisResult.value.output
+      ) {
+        console.error(
+          'Error from analysis prompt:',
+          analysisResult.status === 'rejected'
+            ? analysisResult.reason
+            : 'Prompt returned null output'
+        );
+        throw new Error(
+          'Failed to get a valid response from the analysis model. It might be unavailable or the request timed out.'
+        );
       }
 
-      if (heatmapResult.status === 'fulfilled') {
-        heatMapDataUri = heatmapResult.value.heatMapDataUri;
-      } else {
+      const {explanation, sourceVerification} = analysisResult.value.output;
+
+      const heatMapDataUri =
+        heatmapResult.status === 'fulfilled'
+          ? heatmapResult.value.heatMapDataUri
+          : undefined;
+      
+      if (heatmapResult.status === 'rejected') {
         console.error('Error from heatmap generator:', heatmapResult.reason);
-        // We can still proceed without a heatmap
-        heatMapDataUri = undefined;
       }
 
       return {
@@ -160,10 +156,10 @@ const explainImageManipulationDetectionFlow = ai.defineFlow(
         heatMapDataUri,
         sourceVerification,
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in explainImageManipulationDetectionFlow:', error);
       return {
-        explanation: 'An unexpected error occurred during the analysis. Please try again.',
+        explanation: error.message || 'An unexpected error occurred during the analysis. Please try again.',
         heatMapDataUri: undefined,
         sourceVerification: undefined,
       };
