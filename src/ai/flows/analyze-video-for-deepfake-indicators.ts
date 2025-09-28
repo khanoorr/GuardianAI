@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview This file defines a Genkit flow for analyzing video files to detect deepfake indicators.
@@ -20,12 +21,17 @@ const AnalyzeVideoInputSchema = z.object({
 export type AnalyzeVideoInput = z.infer<typeof AnalyzeVideoInputSchema>;
 
 const AnalyzeVideoOutputSchema = z.object({
+  isAuthentic: z
+    .boolean()
+    .describe('True if the video is likely authentic, false if it shows signs of manipulation.'),
   deepfakeDetected: z
     .boolean()
-    .describe('Whether a deepfake is detected in the video.'),
+    .describe('Whether the video is suspected to be a deepfake.'),
   analysisDetails: z
     .string()
-    .describe('Detailed analysis of the video, including specific indicators of manipulation.'),
+    .describe(
+      'A detailed explanation of the analysis, including any detected deepfake indicators like unnatural facial movements, lighting inconsistencies, or other artifacts.'
+    ),
 });
 export type AnalyzeVideoOutput = z.infer<typeof AnalyzeVideoOutputSchema>;
 
@@ -41,11 +47,19 @@ const prompt = ai.definePrompt({
   output: {schema: AnalyzeVideoOutputSchema},
   prompt: `You are an expert in video forensics and deepfake detection.
 
-You are given a video file and must determine if it is a deepfake. Analyze for signs of manipulation like facial artifacts, unnatural movements, or inconsistencies in lighting and shadows.
+You are given a video file and must determine if it is a deepfake.
 
-Analyze the provided video and provide a determination for the following fields:
-- deepfakeDetected: true if a deepfake is suspected, false otherwise.
-- analysisDetails: A detailed explanation of your analysis, including specific indicators that led to your conclusion. Cite any visual inconsistencies or anomalies.
+Analyze the provided video for common deepfake indicators such as:
+- Unnatural facial movements or expressions.
+- Inconsistencies in lighting, shadows, or reflections.
+- Blurring or artifacts around the edges of a person's face or body.
+- Lack of natural blinking.
+- Audio-visual synchronization issues.
+
+Based on your analysis, provide a determination for the following fields:
+- isAuthentic: Set to false if deepfakeDetected is true.
+- deepfakeDetected: true if you suspect the video is a deepfake, false otherwise.
+- analysisDetails: A detailed explanation of your findings. If you detect a deepfake, describe the specific indicators that led you to that conclusion.
 
 Video: {{media url=videoDataUri}}`,
 });
@@ -65,10 +79,10 @@ const analyzeVideoFlow = ai.defineFlow(
       return output;
     } catch (error: any) {
       console.error('Error in analyzeVideoFlow:', error);
-      // Return a structured error response that matches the output schema.
       return {
+        isAuthentic: true,
         deepfakeDetected: false,
-        analysisDetails: `An error occurred during video analysis: ${error.message || 'Please try again.'}`,
+        analysisDetails: `An error occurred during video analysis: ${error.message || 'Unknown error'}.`,
       };
     }
   }

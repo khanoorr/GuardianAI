@@ -14,12 +14,15 @@ const AnalyzeAudioInputSchema = z.object({
   audioDataUri: z
     .string()
     .describe(
-      'The audio file as a data URI that must include a MIME type and use Base64 encoding. Expected format: \'data:<mimetype>;base64,<encoded_data>\'.'
+      "The audio file as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
 });
 export type AnalyzeAudioInput = z.infer<typeof AnalyzeAudioInputSchema>;
 
 const AnalyzeAudioOutputSchema = z.object({
+  isAuthentic: z
+    .boolean()
+    .describe('True if the audio is likely authentic, false if it shows signs of being synthetic or cloned.'),
   voiceCloningDetected: z
     .boolean()
     .describe('Whether voice cloning is detected in the audio.'),
@@ -47,6 +50,7 @@ const prompt = ai.definePrompt({
 You are given an audio file and must determine if it is a deepfake, specifically if it is the result of voice cloning or is synthetic audio.
 
 Analyze the provided audio and provide a determination for the following fields:
+- isAuthentic: Set to false if voiceCloningDetected or syntheticAudioDetected is true.
 - voiceCloningDetected: true if voice cloning is suspected, false otherwise.
 - syntheticAudioDetected: true if the audio appears to be synthetically generated, false otherwise.
 - analysisDetails: A detailed explanation of your analysis, including specific indicators that led to your conclusion. Cite any inconsistencies or anomalies found in the audio.
@@ -61,7 +65,20 @@ const analyzeAudioFlow = ai.defineFlow(
     outputSchema: AnalyzeAudioOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    try {
+      const {output} = await prompt(input);
+      if (!output) {
+        throw new Error('The AI model did not return a valid analysis. This might be due to a timeout or an internal error.');
+      }
+      return output;
+    } catch (error: any) {
+      console.error('Error in analyzeAudioFlow:', error);
+      return {
+        isAuthentic: true,
+        voiceCloningDetected: false,
+        syntheticAudioDetected: false,
+        analysisDetails: `An error occurred during audio analysis: ${error.message || 'Unknown error'}.`,
+      };
+    }
   }
 );
