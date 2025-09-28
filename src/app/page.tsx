@@ -3,8 +3,9 @@ import ImageAnalysis from "@/components/dashboard/image-analysis"
 import TextAnalysis from "@/components/dashboard/text-analysis"
 import AudioAnalysis from "@/components/dashboard/audio-analysis"
 import VideoAnalysis from "@/components/dashboard/video-analysis"
+import DemoVideo from "@/components/dashboard/demo-video"
 import Logo from "@/components/logo"
-import { ScanFace, FileText, MicVocal, Video } from "lucide-react"
+import { ScanFace, FileText, MicVocal, Video, Clapperboard } from "lucide-react"
 
 export default function Home() {
   return (
@@ -27,7 +28,7 @@ export default function Home() {
           </div>
           
           <Tabs defaultValue="image" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 h-14 rounded-lg p-2">
+            <TabsList className="grid w-full grid-cols-5 h-14 rounded-lg p-2">
               <TabsTrigger value="image" className="flex items-center gap-2 text-base h-full">
                 <ScanFace className="h-5 w-5" /> Image Analysis
               </TabsTrigger>
@@ -39,6 +40,9 @@ export default function Home() {
               </TabsTrigger>
               <TabsTrigger value="video" className="flex items-center gap-2 text-base h-full">
                 <Video className="h-5 w-5" /> Video Analysis
+              </TabsTrigger>
+              <TabsTrigger value="demo" className="flex items-center gap-2 text-base h-full">
+                <Clapperboard className="h-5 w-5" /> Demo Video
               </TabsTrigger>
             </TabsList>
             <TabsContent value="image" className="mt-6">
@@ -52,6 +56,9 @@ export default function Home() {
             </TabsContent>
             <TabsContent value="video" className="mt-6">
               <VideoAnalysis />
+            </TabsContent>
+            <TabsContent value="demo" className="mt-6">
+              <DemoVideo />
             </TabsContent>
           </Tabs>
         </div>
