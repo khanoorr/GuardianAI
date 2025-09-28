@@ -30,6 +30,13 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+      // Increase timeout for video generation
+      serverActionsTimeout: 120,
+    },
+  },
 };
 
 export default nextConfig;
